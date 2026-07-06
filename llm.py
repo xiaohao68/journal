@@ -1,7 +1,13 @@
 import os
+import time
+from dataclasses import dataclass
 from pathlib import Path
 
-from langchain_community.chat_models import ChatZhipuAI
+import httpx
+import jwt
+
+
+API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 
 system_prompt = """
 你是一名期刊分析专家，请根据下面参考资料，回答用户想要的期刊，并详细写出关于期刊的全部信息。
@@ -42,9 +48,43 @@ human_prompt = """
 {data}
 """
 
-from langchain_core.prompts import ChatPromptTemplate
-prompt_template=ChatPromptTemplate.from_messages(
-    [("system", system_prompt), ("human", human_prompt)])
+
+@dataclass
+class AIResponse:
+    content: str
+
+
+class JournalPromptTemplate:
+    def invoke(self, values):
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": human_prompt.format(**values)},
+        ]
+
+
+class ZhipuChat:
+    def __init__(self, model, api_key):
+        self.model = model
+        self.api_key = api_key
+
+    def invoke(self, messages):
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0.7,
+            "stream": False,
+        }
+        headers = {
+            "Authorization": _get_jwt_token(self.api_key),
+            "Accept": "application/json",
+        }
+
+        with httpx.Client(timeout=60) as client:
+            response = client.post(API_URL, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+
+        return AIResponse(content=data["choices"][0]["message"]["content"])
 
 
 def _get_zhipuai_api_key():
@@ -63,7 +103,28 @@ def _get_zhipuai_api_key():
     raise RuntimeError("请先设置 ZHIPUAI_API_KEY 环境变量或在本地 .env 中配置该密钥。")
 
 
-def get_llm():
-    llm=ChatZhipuAI(model="glm-4-flash",api_key=_get_zhipuai_api_key())
-    return llm,prompt_template
+def _get_jwt_token(api_key):
+    try:
+        api_id, secret = api_key.split(".")
+    except ValueError as exc:
+        raise ValueError("ZHIPUAI_API_KEY 格式不正确。") from exc
 
+    timestamp = int(round(time.time() * 1000))
+    payload = {
+        "api_key": api_id,
+        "exp": timestamp + 3 * 60 * 1000,
+        "timestamp": timestamp,
+    }
+    return jwt.encode(
+        payload,
+        secret,
+        algorithm="HS256",
+        headers={"alg": "HS256", "sign_type": "SIGN"},
+    )
+
+
+prompt_template = JournalPromptTemplate()
+
+
+def get_llm():
+    return ZhipuChat(model="glm-4-flash", api_key=_get_zhipuai_api_key()), prompt_template

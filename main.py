@@ -38,7 +38,15 @@ from model import QueryRequest,Journal_Response
 from retriever import get_retriever
 retriever=get_retriever()
 from llm import get_llm
-llm,prompt_template=get_llm()
+llm = None
+prompt_template = None
+
+
+def get_chat_chain():
+    global llm, prompt_template
+    if llm is None or prompt_template is None:
+        llm, prompt_template = get_llm()
+    return llm, prompt_template
 
 
 @app.get("/")
@@ -58,6 +66,7 @@ def get_journal(request:QueryRequest=Body(...)):
             return Journal_Response(journal_information="无法查阅你想要的期刊。")
 
         context_text = "\n\n".join(doc.page_content for doc in retriever_data)
+        llm, prompt_template = get_chat_chain()
         prompt_value = prompt_template.invoke({"data": context_text})
         response = llm.invoke(prompt_value)
         print("response结果为:",response.content)

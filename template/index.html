@@ -286,8 +286,10 @@
             const loaderWrapper = document.getElementById('loaderWrapper');
             const resultContent = document.getElementById('resultContent');
 
-            // 后端接口地址：固定请求 FastAPI 服务，避免 Live Server/file 打开时请求到错误端口
-            const API_URL = 'http://127.0.0.1:8000/journal_information';
+            // 本地调试走 FastAPI 端口，线上部署走同域接口
+            const API_URL = ['localhost', '127.0.0.1', ''].includes(window.location.hostname)
+                ? 'http://127.0.0.1:8000/journal_information'
+                : '/journal_information';
 
             // 显示加载状态
             function showLoading() {

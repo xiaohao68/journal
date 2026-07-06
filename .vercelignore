@@ -1,0 +1,10 @@
+.env
+.git/
+.agents/
+.claude/
+__pycache__/
+*.py[cod]
+*.log
+.venv/
+venv/
+env/
