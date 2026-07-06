@@ -92,15 +92,29 @@ def _get_zhipuai_api_key():
     if api_key:
         return api_key.strip().strip("'\"")
 
-    env_path = Path(__file__).resolve().parent / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            if not line.strip().startswith("ZHIPUAI_API_KEY"):
-                continue
-            _, value = line.split("=", 1)
-            return value.split("#", 1)[0].strip().strip("'\"")
+    base_path = Path(__file__).resolve().parent
+    for env_file in [base_path / ".env", base_path / ".env.example"]:
+        api_key = _read_zhipuai_api_key_from_file(env_file)
+        if api_key:
+            return api_key
 
-    raise RuntimeError("请先设置 ZHIPUAI_API_KEY 环境变量或在本地 .env 中配置该密钥。")
+    raise RuntimeError("请先设置 ZHIPUAI_API_KEY 环境变量，或在 .env/.env.example 中配置该密钥。")
+
+
+def _read_zhipuai_api_key_from_file(env_path):
+    if not env_path.exists():
+        return None
+
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped_line = line.strip()
+        if not stripped_line or stripped_line.startswith("#"):
+            continue
+        if not stripped_line.startswith("ZHIPUAI_API_KEY"):
+            continue
+        _, value = stripped_line.split("=", 1)
+        return value.split("#", 1)[0].strip().strip("'\"") or None
+
+    return None
 
 
 def _get_jwt_token(api_key):
