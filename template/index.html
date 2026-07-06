@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>期刊智能查询</title>
+    <!-- 使用 Google Font 提升美观 -->
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        /* ===== 全局重置 & 基础 ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* 背景：使用 CSS 渐变模拟风景，同时可叠加图片 */
+            background: linear-gradient(145deg, #2b5a7a 0%, #6fa3b0 40%, #b8d4c9 70%, #f0e6c5 100%);
+            /* 如果想用图片，可把上面注释掉，用下面这个（替换为你的图片URL） */
+            /* background: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80') no-repeat center center/cover; */
+            position: relative;
+            padding: 20px;
+        }
+
+        /* 半透明遮罩，让文字更清晰 */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(2px);
+            z-index: 0;
+        }
+
+        /* 主卡片 */
+        .container {
+            position: relative;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            border-radius: 48px;
+            padding: 40px 45px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 20, 30, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s;
+        }
+
+        /* 标题 */
+        .title {
+            font-weight: 600;
+            font-size: 2.2rem;
+            color: #1d3b4f;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .title span {
+            background: #2b5a7a;
+            color: white;
+            font-size: 1rem;
+            padding: 2px 16px;
+            border-radius: 40px;
+            font-weight: 400;
+        }
+
+        .subtitle {
+            color: #3a5e72;
+            font-size: 1rem;
+            margin-bottom: 30px;
+            border-left: 4px solid #4a8b9b;
+            padding-left: 16px;
+            opacity: 0.8;
+        }
+
+        /* 输入区域 */
+        .input-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .input-group input {
+            flex: 1;
+            min-width: 200px;
+            padding: 16px 22px;
+            border: none;
+            border-radius: 60px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(4px);
+            font-size: 1rem;
+            outline: 2px solid transparent;
+            transition: 0.25s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .input-group input:focus {
+            outline: 2px solid #4a8b9b;
+            background: rgba(255, 255, 255, 0.9);
+        }
+        .input-group button {
+            padding: 16px 36px;
+            border: none;
+            border-radius: 60px;
+            background: #1d3b4f;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.25s;
+            box-shadow: 0 8px 20px rgba(29, 59, 79, 0.3);
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+        .input-group button:hover {
+            background: #2b5a7a;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(29, 59, 79, 0.4);
+        }
+        .input-group button:disabled {
+            opacity: 0.5;
+            transform: none;
+            cursor: not-allowed;
+        }
+
+        /* 结果区域 */
+        .result-box {
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(4px);
+            border-radius: 32px;
+            padding: 24px 28px;
+            min-height: 140px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: 0.3s;
+            position: relative;
+        }
+
+        .result-placeholder {
+            color: #4a6b7c;
+            font-size: 1rem;
+            text-align: center;
+            padding: 30px 0;
+            opacity: 0.6;
+            letter-spacing: 0.5px;
+        }
+
+        .result-content {
+            font-size: 1rem;
+            line-height: 1.8;
+            color: #1a2e3b;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* ===== 加载动画 (旋转花朵) ===== */
+        .loader-wrapper {
+            display: none; /* 默认隐藏 */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 0;
+        }
+        .loader-wrapper.active {
+            display: flex;
+        }
+
+        .loader-flower {
+            width: 80px;
+            height: 80px;
+            position: relative;
+            animation: rotate-flower 2.4s linear infinite;
+        }
+        .petal {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #f3b0a0;
+            border-radius: 50% 50% 0 50%;
+            transform-origin: bottom right;
+            opacity: 0.8;
+            box-shadow: 0 4px 10px rgba(243, 176, 160, 0.4);
+        }
+        .petal:nth-child(1) { transform: rotate(0deg) translateY(-35px); }
+        .petal:nth-child(2) { transform: rotate(72deg) translateY(-35px); background: #f5c5b0; }
+        .petal:nth-child(3) { transform: rotate(144deg) translateY(-35px); background: #f0b8a5; }
+        .petal:nth-child(4) { transform: rotate(216deg) translateY(-35px); background: #f3baa8; }
+        .petal:nth-child(5) { transform: rotate(288deg) translateY(-35px); background: #f7cdb8; }
+        .center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: #f7e05e;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #f7e05e88;
+        }
+
+        @keyframes rotate-flower {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            margin-top: 18px;
+            font-size: 1rem;
+            color: #2b5a7a;
+            font-weight: 600;
+            letter-spacing: 2px;
+            animation: pulse-text 1.6s ease-in-out infinite;
+        }
+        @keyframes pulse-text {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* 小屏适配 */
+        @media (max-width: 600px) {
+            .container { padding: 28px 20px; }
+            .title { font-size: 1.6rem; flex-wrap: wrap; }
+            .input-group input { min-width: 150px; }
+            .input-group button { padding: 14px 24px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 背景遮罩（增加景深感） -->
+    <div class="overlay"></div>
+
+    <div class="container">
+        <div class="title">
+            📚 期刊智询
+            <span>AI</span>
+        </div>
+        <div class="subtitle">
+            输入期刊名称，大模型基于向量知识库为您解答
+        </div>
+
+        <!-- 输入区 -->
+        <div class="input-group">
+            <input type="text" id="journalInput" placeholder="例如：国际贸易" value="国际贸易">
+            <button id="queryBtn">✨ 智能查询</button>
+        </div>
+
+        <!-- 结果展示区 -->
+        <div class="result-box" id="resultBox">
+            <!-- 占位提示 -->
+            <div id="placeholder" class="result-placeholder">
+                🌿 输入期刊名称，点击查询获取智能分析
+            </div>
+
+            <!-- 加载动画（默认隐藏） -->
+            <div class="loader-wrapper" id="loaderWrapper">
+                <div class="loader-flower">
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="center"></div>
+                </div>
+                <div class="loader-text">正在思考中，请稍候…</div>
+            </div>
+
+            <!-- 真正的内容 -->
+            <div id="resultContent" class="result-content" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const inputEl = document.getElementById('journalInput');
+            const queryBtn = document.getElementById('queryBtn');
+            const placeholder = document.getElementById('placeholder');
+            const loaderWrapper = document.getElementById('loaderWrapper');
+            const resultContent = document.getElementById('resultContent');
+
+            // 后端接口地址：固定请求 FastAPI 服务，避免 Live Server/file 打开时请求到错误端口
+            const API_URL = 'http://127.0.0.1:8000/journal_information';
+
+            // 显示加载状态
+            function showLoading() {
+                placeholder.style.display = 'none';
+                resultContent.style.display = 'none';
+                loaderWrapper.classList.add('active');
+                queryBtn.disabled = true;
+                queryBtn.textContent = '⏳ 查询中...';
+            }
+
+            // 隐藏加载，显示结果
+            function showResult(text) {
+                loaderWrapper.classList.remove('active');
+                resultContent.style.display = 'block';
+                resultContent.textContent = text;
+                queryBtn.disabled = false;
+                queryBtn.textContent = '✨ 智能查询';
+                placeholder.style.display = 'none';
+            }
+
+            // 显示错误信息
+            function showError(msg) {
+                loaderWrapper.classList.remove('active');
+                resultContent.style.display = 'block';
+                resultContent.textContent = '❌ ' + msg;
+                queryBtn.disabled = false;
+                queryBtn.textContent = '✨ 智能查询';
+                placeholder.style.display = 'none';
+            }
+
+            // 重置到初始状态（清空结果）
+            function resetToPlaceholder() {
+                loaderWrapper.classList.remove('active');
+                resultContent.style.display = 'none';
+                placeholder.style.display = 'block';
+                queryBtn.disabled = false;
+                queryBtn.textContent = '✨ 智能查询';
+            }
+
+            // 核心查询函数
+            async function queryJournal() {
+                const keyword = inputEl.value.trim();
+                if (!keyword) {
+                    alert('请输入期刊名称');
+                    return;
+                }
+
+                // 如果正在加载，避免重复点击
+                if (queryBtn.disabled) return;
+
+                // 清空旧结果，显示加载
+                showLoading();
+
+                try {
+                    // 调用后端接口（建议改为 POST 或 GET，这里用 POST 示例）
+                    const response = await fetch(API_URL, {
+                        method: 'POST',   // 原 PUT 建议改为 POST
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ journal: keyword })
+                    });
+
+                    if (!response.ok) {
+                        let errText = await response.text();
+                        try {
+                            const errData = JSON.parse(errText);
+                            errText = errData.detail || errData.msg || errText;
+                        } catch (_) {}
+                        throw new Error(`服务器错误 (${response.status}): ${errText}`);
+                    }
+
+                    const data = await response.json();
+                    // 假设后端返回 { "response": "大模型回答内容" }
+                    const answer = data.journal_information || data.answer || data.result || '无返回内容';
+                    showResult(answer);
+
+                } catch (error) {
+                    console.error('查询失败:', error);
+                    if (error instanceof TypeError && error.message.includes('fetch')) {
+                        showError('请求失败：无法连接后端服务，请确认 FastAPI 已启动并访问 http://127.0.0.1:8000/');
+                    } else {
+                        showError('请求失败：' + error.message);
+                    }
+                }
+            }
+
+            // 绑定点击事件
+            queryBtn.addEventListener('click', queryJournal);
+
+            // 回车触发
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    queryBtn.click();
+                }
+            });
+
+            // 可选：用户输入时清空结果（自动重置占位）
+            inputEl.addEventListener('input', () => {
+                // 如果当前显示的是结果，可以重置，但为了不丢失，可以保留，让用户手动再次查询
+                // 这里我们不做自动重置，避免误触
+            });
+
+            // 初始化：如果输入框有默认值，可自动查询？不要自动，用户手动。
+        })();
+    </script>
+</body>
+</html>
