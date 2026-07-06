@@ -8,6 +8,7 @@ import jwt
 
 
 API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+DEFAULT_MODEL = "glm-4-flash"
 
 system_prompt = """
 你是一名期刊分析专家，请根据下面参考资料，回答用户想要的期刊，并详细写出关于期刊的全部信息。
@@ -23,7 +24,7 @@ system_prompt = """
 作者：张文章
 引题：16 省市消协组织及《中国消费者》杂志联合调查发现
 正文快照：
-9 月 26 日，福建省消费者权益保护委员会联合黑龙江、江苏等 16 省市消协组织及《中国消费者》杂志，共同发布《“护银龄破暗域” 私域直播乱象消费调查报告》。本次调查通过线上问卷与志愿者线下体察相结合的方式展开，系统地揭示了私域直播在精准围猎老年群体过程中存在的虚假宣传相关乱象。
+9 月 26 日，福建省消费者权益保护委员会联合黑龙江、江苏等 16 省市消费者协会及《中国消费者》杂志，共同发布《“护银龄破暗域” 私域直播乱象消费调查报告》。本次调查通过线上问卷与志愿者线下体察相结合的方式展开，系统地揭示了私域直播在精准围猎老年群体过程中存在的虚假宣传相关乱象。
 二、出版与标识信息
 报纸出版日期：2025-09-30
 版面号：001
@@ -68,6 +69,23 @@ class ZhipuChat:
         self.api_key = api_key
 
     def invoke(self, messages):
+        try:
+            return self._invoke_with_sdk(messages)
+        except ModuleNotFoundError:
+            return self._invoke_with_http(messages)
+
+    def _invoke_with_sdk(self, messages):
+        from zhipuai import ZhipuAI
+
+        client = ZhipuAI(api_key=self.api_key)
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            temperature=0.7,
+        )
+        return AIResponse(content=response.choices[0].message.content)
+
+    def _invoke_with_http(self, messages):
         payload = {
             "model": self.model,
             "messages": messages,
@@ -100,7 +118,11 @@ def _get_zhipuai_api_key():
             _, value = line.split("=", 1)
             return value.split("#", 1)[0].strip().strip("'\"")
 
-    raise RuntimeError("请先设置 ZHIPUAI_API_KEY 环境变量或在本地 .env 中配置该密钥。")
+    raise RuntimeError("请在 Vercel 环境变量或本地 .env 中配置 ZHIPUAI_API_KEY。")
+
+
+def _get_zhipuai_model():
+    return os.getenv("ZHIPUAI_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
 
 
 def _get_jwt_token(api_key):
@@ -127,4 +149,4 @@ prompt_template = JournalPromptTemplate()
 
 
 def get_llm():
-    return ZhipuChat(model="glm-4-flash", api_key=_get_zhipuai_api_key()), prompt_template
+    return ZhipuChat(model=_get_zhipuai_model(), api_key=_get_zhipuai_api_key()), prompt_template
